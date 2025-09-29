@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Farmachelo - Pago</title>
+  <link rel="stylesheet" href="payment.css">
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
+  <script src="../src/payment.js" defer></script>
+</head>
+<body>
+  <main class="main-bg-gradient" style="min-height:100vh;">
+    <div class="container payment-container">
+      <!-- Left Panel - Order Summary -->
+      <section class="order-panel">
+        <header class="header">
+          <div class="logo">
+            <span class="logo-icon">🏥</span>
+            <span class="logo-text">Farmachelo</span>
+          </div>
+        </header>
+        <div class="order-summary">
+          <h2>Resumen del Pedido</h2>
+          <div class="total-amount">
+            <span class="currency">$</span>
+            <span class="amount" id="totalAmount">0.00</span>
+            <span class="currency-code">USD</span>
+          </div>
+          <ul class="items-list" id="itemsList">
+            <!-- Items will be populated by JavaScript -->
+          </ul>
+        </div>
+        <div class="powered-by">
+          <p>Powered by Farmachelo</p>
+        </div>
+      </section>
+      <!-- Right Panel - Payment Form -->
+      <section class="payment-panel">
+        <div class="payment-header">
+          <h2>Detalles de Pago</h2>
+        </div>
+        <div class="apple-pay-btn" id="applePayBtn">
+          Pagar con Apple Pay
+        </div>
+        <div class="payment-subtitle">
+          O ingresa tus datos de tarjeta
+        </div>
+        <form id="paymentForm" class="payment-form">
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="cardNumber">Número de tarjeta</label>
+              <input type="text" id="cardNumber" name="cardNumber" placeholder="1234 5678 9012 3456" required>
+            </div>
+            <div class="form-group half">
+              <label for="expiryDate">Fecha de expiración</label>
+              <input type="text" id="expiryDate" name="expiryDate" placeholder="MM/AA" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="cvv">CVV</label>
+              <input type="text" id="cvv" name="cvv" placeholder="123" required>
+            </div>
+            <div class="form-group half">
+              <label for="cardholderName">Nombre del titular</label>
+              <input type="text" id="cardholderName" name="cardholderName" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="country">País</label>
+            <select id="country" name="country" required>
+              <option value="">Selecciona tu país</option>
+              <option value="US">Estados Unidos</option>
+              <option value="MX">México</option>
+              <option value="CO">Colombia</option>
+              <option value="AR">Argentina</option>
+              <option value="PE">Perú</option>
+              <!-- Add more countries as needed -->
+            </select>
+          </div>
+          <button type="submit" class="pay-button" id="payButton">
+            Pagar $<span id="payButtonAmount">0.00</span> USD
+          </button>
+        </form>
+        <div class="security-info">
+          <div class="security-icons">
+            <img src="https://img.icons8.com/color/48/000000/visa.png" alt="Visa" class="card-icon">
+            <img src="https://img.icons8.com/color/48/000000/mastercard.png" alt="Mastercard" class="card-icon">
+            <img src="https://img.icons8.com/color/48/000000/amex.png" alt="American Express" class="card-icon">
+            <img src="https://img.icons8.com/color/48/000000/discover.png" alt="Discover" class="card-icon">
+          </div>
+          <p>Transacciones seguras y encriptadas</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Login Modal (hidden by default) -->
+  <div class="modal" id="loginModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Iniciar Sesión</h3>
+        <span class="close" id="closeModal">&times;</span>
+      </div>
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" name="loginEmail" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Contraseña</label>
+          <input type="password" id="loginPassword" name="loginPassword" required>
+        </div>
+        <button type="submit" class="login-button">
+          Iniciar Sesión
+        </button>
+        <div class="login-links">
+          <a href="#" id="forgotPassword">¿Olvidaste tu contraseña?</a>
+          <a href="#" id="createAccount">¿No tienes una cuenta? Regístrate</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
