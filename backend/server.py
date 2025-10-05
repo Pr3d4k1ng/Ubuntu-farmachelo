@@ -625,13 +625,13 @@ async def get_order_summary(order_id: str, current_user_id: str = Depends(get_cu
                     "image_url": product.get("image_url")
                 })
         
-        return {
-    "order_id": order_id,
-    "items": enriched_items,
-    "total_amount": total_amount,
-    "currency": "COP",  # Cambiar de "$" a "COP"
-    "status": order.get("status", "pending")
-}
+                return {
+                    "order_id": order_id,
+                    "items": enriched_items,
+                    "total_amount": total_amount,
+                    "currency": "COP",  # Ya está correcto
+                    "status": order.get("status", "pending")
+                }
         
     except Exception as e:
         logger.error(f"Error getting order summary: {str(e)}")
@@ -732,7 +732,7 @@ PHARMACY_PRODUCTS = [
     {
         "name": "Paracetamol 500mg",
         "description": "Analgésico y antipirético para alivio del dolor y fiebre",
-        "price": 8500,  # Cambiar de 8.50 a 8500 (pesos colombianos)
+        "price": 8500,
         "category": "over_counter",
         "stock": 100,
         "image_url": "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHw0fHxwaGFybWFjeXxlbnwwfHx8fDE3NTYyNTEyMjd8MA&ixlib=rb-4.1.0&q=85",
@@ -741,13 +741,12 @@ PHARMACY_PRODUCTS = [
     {
         "name": "Ibuprofeno 400mg",
         "description": "Antiinflamatorio no esteroideo para dolor e inflamación",
-        "price": 12000,  # Cambiar de 12.00 a 12000
+        "price": 12000,
         "category": "over_counter",
         "stock": 85,
         "image_url": "https://images.pexels.com/photos/139398/thermometer-headache-pain-pills-139398.jpeg",
         "requires_prescription": False
     },
-    # ... actualizar todos los precios de manera similar
 ]
 
 # ==================== LIFESPAN HANDLER ====================

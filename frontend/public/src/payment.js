@@ -1,3 +1,13 @@
+function formatPrice(price) {
+  const numericPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(numericPrice);
+}
+
 // API Configuration - Replace with your actual endpoints
 const API_CONFIG = {
   baseURL: "http://localhost:8000/api", // Cambia si tu backend está en otra URL
@@ -69,9 +79,9 @@ class FormHandler {
           'Authorization': `Bearer ${this.getAuthToken()}`
         },
         body: JSON.stringify({
-          amount: parseFloat(paymentData.amount.replace(",", ".").replace("$", "")),
+          amount: paymentData.amount,
           currency: paymentData.currency,
-          cart: paymentData.cartItems || [] // Enviar los productos del carrito
+          cart: this.orderManager.items || [] // Enviar los productos del carrito
         })
       })
       const data = await response.json()
@@ -129,8 +139,8 @@ class FormHandler {
       cvv: formData.get("cvv"),
       cardholderName: formData.get("cardholderName"),
       country: formData.get("country"),
-      amount: this.total || document.getElementById("totalAmount")?.textContent || "0",
-      currency: "$",
+      amount: this.orderManager.total,
+      currency: "COP",
     };
 
     try {
@@ -214,7 +224,7 @@ class FormHandler {
       button.disabled = false
       button.innerHTML =
         button.id === "payButton"
-          ? `Pagar $${document.getElementById("payButtonAmount")?.textContent || ""} USD`
+          ? `Pagar ${document.getElementById("payButtonAmount")?.textContent || ""}`
           : "Iniciar Sesión"
     }
   }
@@ -334,29 +344,8 @@ async loadOrderData() {
     const totalAmount = document.getElementById("totalAmount");
     const payButtonAmount = document.getElementById("payButtonAmount");
     
-    if (totalAmount) totalAmount.textContent = total.toFixed(2);
-    if (payButtonAmount) payButtonAmount.textContent = total.toFixed(2);
-  }
-
-  // Añade este nuevo método:
-  updateTotalDisplay(total) {
-    const totalAmount = document.getElementById("totalAmount");
-    const payButtonAmount = document.getElementById("payButtonAmount");
-    
-    if (totalAmount) totalAmount.textContent = total.toFixed(2);
-    if (payButtonAmount) payButtonAmount.textContent = total.toFixed(2);
-  }
-
-  calculateTotal() {
-    // Sumar (precio * cantidad) de cada producto
-    let total = 0;
-    if (this.items && this.items.length > 0) {
-      total = this.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    }
-    const totalAmount = document.getElementById("totalAmount")
-    const payButtonAmount = document.getElementById("payButtonAmount")
-    if (totalAmount) totalAmount.textContent = total.toFixed(2)
-    if (payButtonAmount) payButtonAmount.textContent = total.toFixed(2)
+    if (totalAmount) totalAmount.textContent = formatPrice(total);
+    if (payButtonAmount) payButtonAmount.textContent = formatPrice(total);
   }
 
   addItem(item) {
@@ -381,7 +370,7 @@ async loadOrderData() {
     } else {
       this.items.forEach(item => {
         const li = document.createElement("li")
-        li.textContent = `${item.name} x${item.quantity} - $${(item.price * item.quantity).toFixed(2)}`
+        li.textContent = `${item.name} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`
         itemsList.appendChild(li)
       })
     }
@@ -391,8 +380,8 @@ async loadOrderData() {
 
 // Inicialización
 document.addEventListener("DOMContentLoaded", () => {
-  const formHandler = new FormHandler()
   const orderManager = new OrderManager()
+  const formHandler = new FormHandler(orderManager)
 
   // Handler para el botón "Proceder al pago"
   const payBtn = document.getElementById("payButton")

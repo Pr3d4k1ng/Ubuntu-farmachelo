@@ -411,4 +411,17 @@ input:focus, select:focus {
   .payment-subtitle::after {
     width: 20%;
   }
+
+.currency-code {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.amount {
+  font-size: 3rem;
+  font-weight: 700;
+  color: white;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
 }

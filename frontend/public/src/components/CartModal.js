@@ -32,11 +32,23 @@ const CartModal = ({ isOpen, onClose, cart, onUpdateCart, token }) => {
     }
   };
 
+
+  const formatPrice = (price) => {
+    const numericPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
+
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(numericPrice);
+  };
+
   const getTotalPrice = () => {
     if (!cart || !cart.items) return 0;
     return cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
-
+  
   if (!isOpen) return null;
 
   return (
@@ -70,7 +82,7 @@ const CartModal = ({ isOpen, onClose, cart, onUpdateCart, token }) => {
                     
                     <div className="item-details">
                       <h4>{item.name || 'Producto'}</h4>
-                      <p className="item-price">${(item.price || 0).toFixed(2)}</p>
+                      <p className="item-price">{formatPrice(item.price || 0)}</p>
                       {item.requires_prescription && (
                         <span className="prescription-note">💊 Requiere receta</span>
                       )}
@@ -105,7 +117,7 @@ const CartModal = ({ isOpen, onClose, cart, onUpdateCart, token }) => {
               
               <div className="cart-summary">
                 <div className="total-section">
-                  <h3>Total: ${getTotalPrice().toFixed(2)}</h3>
+                  <h3>Total: {formatPrice(getTotalPrice())}</h3>
                 </div>
                 
                 <div className="cart-actions">
@@ -116,16 +128,9 @@ const CartModal = ({ isOpen, onClose, cart, onUpdateCart, token }) => {
                     className="checkout-btn"
                     onClick={() => {
                       onClose();
-                      // Guardar el carrito actual en localStorage con estructura mejorada
+                      // Guardar el carrito actual en localStorage con el total
                       const cartData = {
-                        items: cart.items.map(item => ({
-                          product_id: item.product_id || item.id,
-                          id: item.product_id || item.id,
-                          name: item.name,
-                          price: item.price,
-                          quantity: item.quantity,
-                          image_url: item.image_url
-                        })),
+                        items: cart.items,
                         total: getTotalPrice()
                       };
                       localStorage.setItem('cart', JSON.stringify(cartData));

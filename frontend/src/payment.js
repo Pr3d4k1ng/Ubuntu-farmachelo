@@ -1,3 +1,13 @@
+function formatPrice(price) {
+  const numericPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(numericPrice);
+}
+
 // API Configuration - Replace with your actual endpoints
 const API_CONFIG = {
   baseURL: "http://localhost:8000/api", // Cambia si tu backend está en otra URL
@@ -10,7 +20,8 @@ const API_CONFIG = {
 }
 
 class FormHandler {
-  constructor() {
+  constructor(orderManager) {
+    this.orderManager = orderManager;
     this.setupCardFormatting()
     const paymentForm = document.getElementById("paymentForm")
     const loginForm = document.getElementById("loginForm")
@@ -59,17 +70,8 @@ class FormHandler {
     }
   }
 
-  /**
-   * Ejemplo de integración con Stripe (flujo recomendado):
-   * 1. Enviar los datos del carrito y monto al backend (no los datos de tarjeta).
-   * 2. El backend crea un PaymentIntent y responde con clientSecret.
-   * 3. Usar Stripe.js para mostrar el formulario seguro y confirmar el pago.
-   *
-   * Aquí se deja la estructura lista para ese flujo:
-   */
   async processPayment(paymentData) {
     try {
-      // Paso 1: Solicitar al backend la creación del PaymentIntent
       const response = await fetch(`${API_CONFIG.baseURL}/payments/create-intent`, {
         method: 'POST',
         headers: {
@@ -77,20 +79,15 @@ class FormHandler {
           'Authorization': `Bearer ${this.getAuthToken()}`
         },
         body: JSON.stringify({
-          amount: parseFloat(paymentData.amount.replace(",", ".").replace("$", "")),
+          amount: paymentData.amount,
           currency: paymentData.currency,
-          cart: paymentData.cartItems || [] // Enviar los productos del carrito
+          cart: this.orderManager.items || []
         })
       })
       const data = await response.json()
       if (!response.ok) {
         return { success: false, error: data.detail || "Error al crear el intento de pago" }
       }
-      // Paso 2: Aquí deberías usar Stripe.js para confirmar el pago con el clientSecret recibido
-      // Ejemplo:
-      // const stripe = Stripe('pk_test_xxx');
-      // await stripe.confirmCardPayment(data.clientSecret, { payment_method: { card, billing_details: {...} } });
-      // Por ahora solo mostramos el clientSecret recibido
       return { success: true, clientSecret: data.clientSecret, message: 'PaymentIntent creado. Integra Stripe.js aquí.' }
     } catch (error) {
       console.error("Payment processing error:", error)
@@ -137,7 +134,7 @@ class FormHandler {
       cvv: formData.get("cvv"),
       cardholderName: formData.get("cardholderName"),
       country: formData.get("country"),
-      amount: document.getElementById("totalAmount")?.textContent || "0",
+      amount: this.orderManager.total,
       currency: "COP",
     }
 
@@ -222,7 +219,7 @@ class FormHandler {
       button.disabled = false
       button.innerHTML =
         button.id === "payButton"
-          ? `Pagar $${document.getElementById("payButtonAmount")?.textContent || ""} COP`
+          ? `Pagar ${document.getElementById("payButtonAmount")?.textContent || ""}`
           : "Iniciar Sesión"
     }
   }
@@ -284,7 +281,7 @@ class FormHandler {
 class OrderManager {
   constructor() {
     this.items = [];
-    // Forzar recarga del carrito desde localStorage cada vez que se abre payment.html
+    this.total = 0;
     window.addEventListener('focus', () => this.loadOrderData());
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) this.loadOrderData();
@@ -292,63 +289,57 @@ class OrderManager {
     this.loadOrderData();
   }
 
-async loadOrderData() {
-  try {
-    // Cargar carrito desde localStorage
-    const cartRaw = localStorage.getItem('cart');
-    let cart = null;
-    
-    if (cartRaw) {
-      try {
-        cart = JSON.parse(cartRaw);
-      } catch (e) { 
-        console.error("Error parsing cart:", e);
-        cart = null;
-      }
-    }
-    
-    if (cart && Array.isArray(cart.items)) {
-      this.items = cart.items.map(item => ({
-        name: item.name || 'Producto',
-        quantity: item.quantity || 1,
-        price: item.price || 0
-      }));
+  async loadOrderData() {
+    try {
+      const cartRaw = localStorage.getItem('cart');
+      let cart = null;
       
-      // Usar el total guardado si está disponible
-      if (cart.total) {
-        this.updateTotalDisplay(cart.total);
+      if (cartRaw) {
+        try {
+          cart = JSON.parse(cartRaw);
+        } catch (e) { 
+          console.error("Error parsing cart:", e);
+          cart = null;
+        }
+      }
+      
+      if (cart && Array.isArray(cart.items)) {
+        this.items = cart.items.map(item => ({
+          name: item.name || 'Producto',
+          quantity: item.quantity || 1,
+          price: item.price || 0
+        }));
+        
+        if (cart.total) {
+          this.total = cart.total;
+          this.updateTotalDisplay(this.total);
+        } else {
+          this.calculateTotal();
+        }
+        
+        this.updateOrderDisplay();
       } else {
         this.calculateTotal();
       }
-      
-      this.updateOrderDisplay();
-    } else {
+    } catch (error) {
+      console.error("Error loading order data:", error);
       this.calculateTotal();
     }
-  } catch (error) {
-    console.error("Error loading order data:", error);
-    this.calculateTotal();
   }
-}
 
-updateTotalDisplay(total) {
-  const totalAmount = document.getElementById("totalAmount");
-  const payButtonAmount = document.getElementById("payButtonAmount");
-  
-  if (totalAmount) totalAmount.textContent = total.toFixed(2);
-  if (payButtonAmount) payButtonAmount.textContent = total.toFixed(2);
-}
-
-calculateTotal() {
-  let total = 0;
-  if (this.items && this.items.length > 0) {
-    total = this.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  updateTotalDisplay(total) {
+    const totalAmount = document.getElementById("totalAmount");
+    const payButtonAmount = document.getElementById("payButtonAmount");
+    const formattedTotal = formatPrice(total);
+    
+    if (totalAmount) totalAmount.textContent = formattedTotal;
+    if (payButtonAmount) payButtonAmount.textContent = formattedTotal;
   }
-  const totalAmount = document.getElementById("totalAmount")
-  const payButtonAmount = document.getElementById("payButtonAmount")
-  if (totalAmount) totalAmount.textContent = Math.round(total).toLocaleString('es-CO');
-  if (payButtonAmount) payButtonAmount.textContent = Math.round(total).toLocaleString('es-CO');
-}
+
+  calculateTotal() {
+    this.total = this.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    this.updateTotalDisplay(this.total);
+  }
 
   addItem(item) {
     this.items.push(item)
@@ -372,7 +363,7 @@ calculateTotal() {
     } else {
       this.items.forEach(item => {
         const li = document.createElement("li")
-        li.textContent = `${item.name} x${item.quantity} - $${(item.price * item.quantity).toFixed(2)}`
+        li.textContent = `${item.name} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`
         itemsList.appendChild(li)
       })
     }
@@ -381,20 +372,17 @@ calculateTotal() {
 }
 
 // Inicialización
-document.addEventListener("DOMContentLoaded", () => {
-  const formHandler = new FormHandler()
+document.addEventListener("DOMContentLoaded", async () => {
   const orderManager = new OrderManager()
+  const formHandler = new FormHandler(orderManager)
 
-  // Handler para el botón "Proceder al pago"
   const payBtn = document.getElementById("payButton")
   if (payBtn) {
     payBtn.addEventListener("click", (e) => {
-      // Si el botón está en un formulario, no prevengas el submit aquí
       if (!formHandler.getAuthToken()) {
         formHandler.openLoginModal()
         return
       }
-      // Mostrar modal de pago si existe
       const paymentModal = document.getElementById("paymentModal")
       if (paymentModal) {
         paymentModal.style.display = "block"
@@ -403,7 +391,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 })
 
-// Export para uso en módulos (opcional)
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { FormHandler, OrderManager, API_CONFIG }
 }
