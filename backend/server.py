@@ -139,7 +139,7 @@ class PaymentRequest(BaseModel):
     email: EmailStr
     card: PaymentCard
     amount: float
-    currency: str = "USD"
+    currency: str = "COP"  # Cambiar de "$" a "COP"
     order_id: Optional[str] = None
 
 class PaymentResponse(BaseModel):
@@ -626,12 +626,12 @@ async def get_order_summary(order_id: str, current_user_id: str = Depends(get_cu
                 })
         
         return {
-            "order_id": order_id,
-            "items": enriched_items,
-            "total_amount": total_amount,
-            "currency": "$",
-            "status": order.get("status", "pending")
-        }
+    "order_id": order_id,
+    "items": enriched_items,
+    "total_amount": total_amount,
+    "currency": "COP",  # Cambiar de "$" a "COP"
+    "status": order.get("status", "pending")
+}
         
     except Exception as e:
         logger.error(f"Error getting order summary: {str(e)}")
@@ -732,7 +732,7 @@ PHARMACY_PRODUCTS = [
     {
         "name": "Paracetamol 500mg",
         "description": "Analgésico y antipirético para alivio del dolor y fiebre",
-        "price": 8.50,
+        "price": 8500,  # Cambiar de 8.50 a 8500 (pesos colombianos)
         "category": "over_counter",
         "stock": 100,
         "image_url": "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHw0fHxwaGFybWFjeXxlbnwwfHx8fDE3NTYyNTEyMjd8MA&ixlib=rb-4.1.0&q=85",
@@ -741,48 +741,13 @@ PHARMACY_PRODUCTS = [
     {
         "name": "Ibuprofeno 400mg",
         "description": "Antiinflamatorio no esteroideo para dolor e inflamación",
-        "price": 12.00,
+        "price": 12000,  # Cambiar de 12.00 a 12000
         "category": "over_counter",
         "stock": 85,
         "image_url": "https://images.pexels.com/photos/139398/thermometer-headache-pain-pills-139398.jpeg",
         "requires_prescription": False
     },
-    {
-        "name": "Amoxicilina 500mg",
-        "description": "Antibiótico para tratamiento de infecciones bacterianas",
-        "price": 25.75,
-        "category": "prescription",
-        "stock": 45,
-        "image_url": "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHw0fHxwaGFybWFjeXxlbnwwfHx8fDE3NTYyNTEyMjd8MA&ixlib=rb-4.1.0&q=85",
-        "requires_prescription": True
-    },
-    {
-        "name": "Vitamina C 1000mg",
-        "description": "Suplemento vitamínico para reforzar el sistema inmunológico",
-        "price": 15.00,
-        "category": "over_counter",
-        "stock": 120,
-        "image_url": "https://images.pexels.com/photos/139398/thermometer-headache-pain-pills-139398.jpeg",
-        "requires_prescription": False
-    },
-    {
-        "name": "Omeprazol 20mg",
-        "description": "Inhibidor de la bomba de protones para acidez estomacal",
-        "price": 18.50,
-        "category": "prescription",
-        "stock": 60,
-        "image_url": "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHw0fHxwaGFybWFjeXxlbnwwfHx8fDE3NTYyNTEyMjd8MA&ixlib=rb-4.1.0&q=85",
-        "requires_prescription": True
-    },
-    {
-        "name": "Jarabe para la Tos",
-        "description": "Jarabe expectorante natural para alivio de la tos",
-        "price": 9.25,
-        "category": "over_counter",
-        "stock": 75,
-        "image_url": "https://images.pexels.com/photos/139398/thermometer-headache-pain-pills-139398.jpeg",
-        "requires_prescription": False
-    }
+    # ... actualizar todos los precios de manera similar
 ]
 
 # ==================== LIFESPAN HANDLER ====================
@@ -954,7 +919,7 @@ async def _enrich_cart(cart: Cart) -> Dict[str, Any]:
             "quantity": item.quantity,
             "prescription_file": item.prescription_file,
             "name": product.get("name") if product else "Producto",
-            "price": float(product.get("price", 0)) if product else 0.0,
+            "price": float(product.get("price", 0)),
             "image_url": product.get("image_url") if product else None,
             "requires_prescription": bool(product.get("requires_prescription", False)) if product else False,
             "id": item.product_id

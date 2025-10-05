@@ -138,7 +138,7 @@ class FormHandler {
       cardholderName: formData.get("cardholderName"),
       country: formData.get("country"),
       amount: document.getElementById("totalAmount")?.textContent || "0",
-      currency: "USD",
+      currency: "COP",
     }
 
     try {
@@ -222,7 +222,7 @@ class FormHandler {
       button.disabled = false
       button.innerHTML =
         button.id === "payButton"
-          ? `Pagar $${document.getElementById("payButtonAmount")?.textContent || ""} USD`
+          ? `Pagar $${document.getElementById("payButtonAmount")?.textContent || ""} COP`
           : "Iniciar Sesión"
     }
   }
@@ -339,17 +339,16 @@ updateTotalDisplay(total) {
   if (payButtonAmount) payButtonAmount.textContent = total.toFixed(2);
 }
 
-  calculateTotal() {
-    // Sumar (precio * cantidad) de cada producto
-    let total = 0;
-    if (this.items && this.items.length > 0) {
-      total = this.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    }
-    const totalAmount = document.getElementById("totalAmount")
-    const payButtonAmount = document.getElementById("payButtonAmount")
-    if (totalAmount) totalAmount.textContent = total.toFixed(2)
-    if (payButtonAmount) payButtonAmount.textContent = total.toFixed(2)
+calculateTotal() {
+  let total = 0;
+  if (this.items && this.items.length > 0) {
+    total = this.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   }
+  const totalAmount = document.getElementById("totalAmount")
+  const payButtonAmount = document.getElementById("payButtonAmount")
+  if (totalAmount) totalAmount.textContent = Math.round(total).toLocaleString('es-CO');
+  if (payButtonAmount) payButtonAmount.textContent = Math.round(total).toLocaleString('es-CO');
+}
 
   addItem(item) {
     this.items.push(item)

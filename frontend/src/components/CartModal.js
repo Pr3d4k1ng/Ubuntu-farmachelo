@@ -33,10 +33,10 @@ const CartModal = ({ isOpen, onClose, cart, onUpdateCart, token }) => {
   };
 
   const getTotalPrice = () => {
-    if (!cart || !cart.items) return 0;
-    return cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+  if (!cart || !cart.items) return 0;
+  return cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
-
+  
   if (!isOpen) return null;
 
   return (

@@ -285,7 +285,7 @@ const App = () => {
     return (
       <div className="loading-screen">
         <div className="loader"></div>
-        <p>Cargando FarmaWeb...</p>
+        <p>Cargando Farmachelo...</p>
       </div>
     );
   }

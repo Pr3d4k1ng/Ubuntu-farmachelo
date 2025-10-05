@@ -36,7 +36,7 @@ const ProductCard = ({ product, onAddToCart, user }) => {
       </div>
       
       <div className="product-footer">
-        <div className="product-price">${product.price.toFixed(2)}</div>
+        <div className="product-price">${product.price.toLocaleString('es-CO')}</div>
         <button 
           className="add-to-cart-btn"
           onClick={handleAddToCart}
