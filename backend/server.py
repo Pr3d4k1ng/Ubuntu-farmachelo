@@ -27,10 +27,10 @@ load_dotenv(ROOT_DIR / '.env')
 
 # MySQL connection
 MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'Cod1029144695')
 MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
 MYSQL_PORT = os.environ.get('MYSQL_PORT', '3306')
-MYSQL_DB = os.environ.get('MYSQL_DB', 'farmachelo_web_database')
+MYSQL_DB = os.environ.get('MYSQL_DB', 'farmachelo_db')
 
 # Crear engine de SQLAlchemy
 SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
@@ -100,7 +100,7 @@ class Cart(Base):
     
     id = Column(String(36), primary_key=True, index=True)
     user_id = Column(String(36), ForeignKey('users.id'), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class CartItem(Base):
     __tablename__ = "cart_items"
@@ -215,8 +215,57 @@ class OrderResponse(BaseModel):
     payment_session_id: Optional[str] = None
     created_at: datetime
 
-# Los modelos de pago se mantienen igual...
-# (Mantén aquí todos los modelos de PaymentCard, PaymentRequest, etc. que tenías antes)
+class PaymentCard(BaseModel):
+    cardNumber: str
+    expiryDate: str
+    cvv: str
+    cardholderName: str
+    country: str
+
+class PaymentRequest(BaseModel):
+    email: EmailStr
+    card: PaymentCard
+    amount: float
+    currency: str = "COP"
+    order_id: Optional[str] = None
+
+class PaymentResponse(BaseModel):
+    success: bool
+    transactionId: Optional[str] = None
+    error: Optional[str] = None
+
+class CardValidationRequest(BaseModel):
+    cardNumber: str
+    expiryDate: str
+    cvv: str
+
+class CardValidationResponse(BaseModel):
+    valid: bool
+    cardType: Optional[str] = None
+    error: Optional[str] = None
+
+class CheckoutRequest(BaseModel):
+    cart_items: List[CartItemModel]
+    origin_url: str
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+class AdminLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    category: Optional[str] = None
+    stock: Optional[int] = None
+    image_url: Optional[str] = None
+    requires_prescription: Optional[bool] = None
+    active: Optional[bool] = None
 
 # ==================== DATABASE DEPENDENCY ====================
 
@@ -226,6 +275,66 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# ==================== PAYMENT HELPER FUNCTIONS ====================
+
+def validate_card_number(card_number: str) -> bool:
+    """Validar número de tarjeta usando el algoritmo de Luhn"""
+    card_number = card_number.replace(" ", "")
+    if not card_number.isdigit():
+        return False
+    
+    # Algoritmo de Luhn
+    total = 0
+    reverse_digits = card_number[::-1]
+    for i, digit in enumerate(reverse_digits):
+        n = int(digit)
+        if i % 2 == 1:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    
+    return total % 10 == 0
+
+def get_card_type(card_number: str) -> str:
+    """Determinar el tipo de tarjeta basado en el número"""
+    card_number = card_number.replace(" ", "")
+    
+    if card_number.startswith("4"):
+        return "Visa"
+    elif card_number.startswith(("51", "52", "53", "54", "55")):
+        return "Mastercard"
+    elif card_number.startswith(("34", "37")):
+        return "Amex"
+    elif card_number.startswith(("300", "301", "302", "303", "304", "305", "36", "38")):
+        return "Diners Club"
+    elif card_number.startswith(("6011", "65")):
+        return "Discover"
+    else:
+        return "Unknown"
+
+def validate_expiry_date(expiry_date: str) -> bool:
+    """Validar fecha de expiración MM/AA"""
+    try:
+        month, year = expiry_date.split("/")
+        month = int(month.strip())
+        year = int(year.strip())
+        
+        # Añadir el siglo (asumimos tarjetas del siglo 21)
+        full_year = 2000 + year
+        
+        # Validar mes
+        if month < 1 or month > 12:
+            return False
+        
+        # Validar que no esté expirada
+        current_date = datetime.now(timezone.utc)
+        expiry_date_obj = datetime(full_year, month, 1, tzinfo=timezone.utc)
+        
+        return expiry_date_obj > current_date
+    except:
+        return False
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -298,9 +407,6 @@ async def get_current_admin(
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# Las funciones de validación de tarjetas se mantienen igual...
-# (Mantén aquí validate_card_number, get_card_type, validate_expiry_date)
-
 # ==================== LIFESPAN HANDLER ====================
 
 @asynccontextmanager
@@ -360,6 +466,9 @@ async def lifespan(app: FastAPI):
             db.commit()
             logger.info("Default admin user created! Email: admin@farmachelo.com, Password: admin123")
             
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}")
+        db.rollback()
     finally:
         db.close()
     
@@ -367,7 +476,6 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down...")
-    # No necesitamos cerrar conexiones explícitamente con SQLAlchemy
 
 # FastAPI app with lifespan
 app = FastAPI(
@@ -376,7 +484,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware (se mantiene igual)
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -385,7 +493,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Logging (se mantiene igual)
+# Logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -394,7 +502,7 @@ logger = logging.getLogger(__name__)
 
 api_router = APIRouter(prefix="/api")
 
-# ==================== ROUTES ACTUALIZADAS ====================
+# ==================== ROUTES ====================
 
 @api_router.get("/")
 async def root():
@@ -582,11 +690,308 @@ async def add_cart_item(
     
     return await _enrich_cart(cart, db)
 
-# ... continúa con el resto de los endpoints adaptándolos de manera similar
+@api_router.put("/cart/items/{product_id}")
+async def update_cart_item(
+    product_id: str, 
+    payload: Dict[str, int], 
+    current_user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    quantity = int(payload.get("quantity", 1))
+    if quantity < 0:
+        quantity = 0
+    
+    cart = await _get_or_create_cart(current_user_id, db)
+    cart_item = db.query(CartItem).filter(
+        CartItem.cart_id == cart.id,
+        CartItem.product_id == product_id
+    ).first()
+    
+    if not cart_item:
+        raise HTTPException(status_code=404, detail="Item not found in cart")
+    
+    if quantity == 0:
+        db.delete(cart_item)
+    else:
+        cart_item.quantity = quantity
+    
+    cart.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    
+    return await _enrich_cart(cart, db)
 
-# Incluir el router
-app.include_router(api_router)
+@api_router.delete("/cart/items/{product_id}")
+async def delete_cart_item(
+    product_id: str, 
+    current_user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    cart = await _get_or_create_cart(current_user_id, db)
+    cart_item = db.query(CartItem).filter(
+        CartItem.cart_id == cart.id,
+        CartItem.product_id == product_id
+    ).first()
+    
+    if cart_item:
+        db.delete(cart_item)
+        cart.updated_at = datetime.now(timezone.utc)
+        db.commit()
+    
+    return await _enrich_cart(cart, db)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# Payment Routes
+@api_router.post("/payments/process", response_model=PaymentResponse)
+async def process_payment(
+    payment_request: PaymentRequest,
+    current_user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Validar que el monto coincida con el carrito actual
+        cart = await _get_or_create_cart(current_user_id, db)
+        enriched_cart = await _enrich_cart(cart, db)
+        cart_total = sum(item["price"] * item["quantity"] for item in enriched_cart["items"])
+        
+        if abs(payment_request.amount - cart_total) > 0.01:
+            return PaymentResponse(success=False, error="El monto no coincide con el carrito actual")
+        
+        # Resto de la lógica original de procesamiento de pago
+        if not validate_card_number(payment_request.card.cardNumber):
+            return PaymentResponse(success=False, error="Número de tarjeta inválido")
+        
+        if not validate_expiry_date(payment_request.card.expiryDate):
+            return PaymentResponse(success=False, error="Fecha de expiración inválida o tarjeta expirada")
+        
+        # Validar CVV (3-4 dígitos)
+        cvv = payment_request.card.cvv
+        if not (3 <= len(cvv) <= 4 and cvv.isdigit()):
+            return PaymentResponse(success=False, error="CVV inválido")
+        
+        # Simular procesamiento de pago
+        success = secrets.SystemRandom().random() > 0.3
+        
+        if success:
+            transaction_id = f"TXN_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(4)}"
+            
+            transaction_data = PaymentTransaction(
+                id=str(uuid.uuid4()),
+                transaction_id=transaction_id,
+                email=payment_request.email,
+                user_id=current_user_id,
+                amount=payment_request.amount,
+                currency=payment_request.currency,
+                card_last_four=payment_request.card.cardNumber[-4:],
+                card_type=get_card_type(payment_request.card.cardNumber),
+                status="completed",
+                order_id=payment_request.order_id
+            )
+            
+            db.add(transaction_data)
+            
+            if payment_request.order_id:
+                order = db.query(Order).filter(Order.id == payment_request.order_id).first()
+                if order:
+                    order.status = "paid"
+                    order.payment_session_id = transaction_id
+            
+            db.commit()
+            
+            return PaymentResponse(success=True, transactionId=transaction_id)
+        else:
+            return PaymentResponse(success=False, error="Tarjeta rechazada por el banco emisor")
+            
+    except Exception as e:
+        logger.error(f"Error processing payment: {str(e)}")
+        db.rollback()
+        return PaymentResponse(success=False, error="Error interno del servidor")
+
+@api_router.post("/payments/validate-card", response_model=CardValidationResponse)
+async def validate_card(card_request: CardValidationRequest):
+    """
+    Validar los datos de una tarjeta de crédito/débito
+    """
+    try:
+        # Validar número de tarjeta
+        if not validate_card_number(card_request.cardNumber):
+            return CardValidationResponse(valid=False, error="Número de tarjeta inválido")
+        
+        # Validar fecha de expiración
+        if not validate_expiry_date(card_request.expiryDate):
+            return CardValidationResponse(valid=False, error="Fecha de expiración inválida o tarjeta expirada")
+        
+        # Validar CVV
+        cvv = card_request.cvv
+        if not (3 <= len(cvv) <= 4 and cvv.isdigit()):
+            return CardValidationResponse(valid=False, error="CVV inválido")
+        
+        # Determinar tipo de tarjeta
+        card_type = get_card_type(card_request.cardNumber)
+        
+        return CardValidationResponse(valid=True, cardType=card_type)
+        
+    except Exception as e:
+        logger.error(f"Error validating card: {str(e)}")
+        return CardValidationResponse(valid=False, error="Error interno del servidor")
+
+@api_router.post("/payments/checkout")
+async def create_checkout_session(
+    checkout_data: CheckoutRequest, 
+    current_user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Calcular el total del carrito
+        total_amount = 0
+        for item in checkout_data.cart_items:
+            product = db.query(Product).filter(Product.id == item.product_id).first()
+            if product:
+                total_amount += product.price * item.quantity
+        
+        # Crear orden
+        order = Order(
+            id=str(uuid.uuid4()),
+            user_id=current_user_id,
+            total_amount=total_amount,
+            status="pending"
+        )
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        
+        # Crear items de la orden
+        for item in checkout_data.cart_items:
+            order_item = OrderItem(
+                id=str(uuid.uuid4()),
+                order_id=order.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                prescription_file=item.prescription_file
+            )
+            db.add(order_item)
+        
+        db.commit()
+        
+        return {
+            "order_id": order.id,
+            "total_amount": total_amount,
+            "currency": "COP",
+            "status": "pending"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating checkout session: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al crear sesión de checkout")
+
+# Orders Routes
+@api_router.get("/orders", response_model=List[OrderResponse])
+async def get_user_orders(
+    current_user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    orders = db.query(Order).filter(Order.user_id == current_user_id).order_by(Order.created_at.desc()).all()
+    
+    orders_response = []
+    for order in orders:
+        order_items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+        items = []
+        for item in order_items:
+            product = db.query(Product).filter(Product.id == item.product_id).first()
+            if product:
+                items.append({
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                    "prescription_file": item.prescription_file,
+                    "name": product.name,
+                    "price": product.price
+                })
+        
+        orders_response.append(OrderResponse(
+            id=order.id,
+            user_id=order.user_id,
+            items=items,
+            total_amount=order.total_amount,
+            status=order.status,
+            payment_session_id=order.payment_session_id,
+            created_at=order.created_at
+        ))
+    
+    return orders_response
+
+@api_router.get("/orders/summary/{order_id}")
+async def get_order_summary(
+    order_id: str, 
+    current_user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener resumen de un pedido para procesar pago
+    """
+    try:
+        # Buscar el pedido
+        order = db.query(Order).filter(Order.id == order_id, Order.user_id == current_user_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        
+        # Obtener items del pedido
+        order_items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+        enriched_items = []
+        total_amount = 0
+        
+        for item in order_items:
+            product = db.query(Product).filter(Product.id == item.product_id).first()
+            if product:
+                item_total = product.price * item.quantity
+                total_amount += item_total
+                
+                enriched_items.append({
+                    "id": item.product_id,
+                    "name": product.name,
+                    "description": product.description,
+                    "quantity": item.quantity,
+                    "price": product.price,
+                    "total": item_total,
+                    "image_url": product.image_url
+                })
+        
+        return {
+            "order_id": order_id,
+            "items": enriched_items,
+            "total_amount": total_amount,
+            "currency": "COP",
+            "status": order.status
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting order summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al obtener resumen del pedido")
+
+# Admin Authentication Routes
+@api_router.post("/admin/register")
+async def admin_register(admin_data: AdminUserCreate, db: Session = Depends(get_db)):
+    # Verificar si el administrador ya existe
+    existing_admin = db.query(AdminUser).filter(AdminUser.email == admin_data.email).first()
+    if existing_admin:
+        raise HTTPException(status_code=400, detail="Admin already registered")
+    
+    # Crear administrador
+    admin_user = AdminUser(
+        id=str(uuid.uuid4()),
+        email=admin_data.email,
+        name=admin_data.name,
+        password=hash_password(admin_data.password)
+    )
+    
+    db.add(admin_user)
+    db.commit()
+    db.refresh(admin_user)
+    
+    # Crear token JWT
+    token = create_jwt_token(admin_user.id)
+    
+    return {"admin": admin_user, "token": token}
+
+@api_router.post("/admin/login")
+async def admin_login(login_data: AdminLogin, db: Session = Depends(get_db)):
+    # Buscar admin user
+    admin_user = db.query(AdminUser).
