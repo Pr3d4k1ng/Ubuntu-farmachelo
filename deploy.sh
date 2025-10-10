@@ -10,6 +10,12 @@ npm install
 npm run build
 cd ..
 
+# Eliminar carpeta duplicada 'frontend/public/src' si existe
+if [ -d frontend/public/src ]; then
+    echo "Eliminando carpeta duplicada frontend/public/src..."
+    rm -rf frontend/public/src
+fi
+
 # --- Instalar dependencias del Backend ---
 echo "Instalando dependencias del backend..."
 cd backend
